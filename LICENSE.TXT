@@ -1,0 +1,10 @@
+----------
+LICENCE
+---------
+You may use this code freely provided that in your documentation you write
+that your product uses linAUDIT (C)Jakub Jozwicki 2021
+and you send me a postcard.
+
+My address is:
+ul. Jugoslowianska 15D
+03-984 Warsaw, Poland
