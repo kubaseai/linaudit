@@ -80,16 +80,18 @@
 -a always,exit -F perm=x -F auid!=-1 -F path=/sbin/rmmod -k kernel_modules
 -a always,exit -F arch=b64 -S finit_module -S init_module -S delete_module -F auid!=-1 -k kernel_modules
 -a always,exit -F arch=b32 -S finit_module -S init_module -S delete_module -F auid!=-1 -k kernel_modules
+
 ## Modprobe configuration
 -w /etc/modprobe.conf -p wa -k modprobe_conf
 -w /etc/modprobe.d -p wa -k modprobe_conf
 
 ## kexec usage (all actions)
--a always,exit -F arch=b64 -S kexec_load -k KEXEC
--a always,exit -F arch=b64 -S kexec_file_load -k KEXEC
--a always,exit -F arch=b32 -S sys_kexec_load -k KEXEC
+-a always,exit -F arch=b64 -F auid!=-1 -S kexec_load -k KEXEC
+-a always,exit -F arch=b64 -F auid!=-1 -S kexec_file_load -k KEXEC
+-a always,exit -F arch=b32 -F auid!=-1 -S sys_kexec_load -k KEXEC
 
 ## Special files
+-a never,exit -F arch=b64 -F exe=/usr/lib/systemd/systemd-logind -S mknod -S mknodat -k exclude_systemd
 -a always,exit -F arch=b32 -S mknod -S mknodat -k special_files
 -a always,exit -F arch=b64 -S mknod -S mknodat -k special_files
 
@@ -97,11 +99,12 @@
 -a always,exit -F arch=b64 -S mount -S umount2 -F auid!=-1 -k mount
 -a always,exit -F arch=b32 -S mount -S umount -S umount2 -F auid!=-1 -k mount
 
-# Change swap (only attributable)
+## Change swap (only attributable)
 -a always,exit -F arch=b64 -S swapon -S swapoff -F auid!=-1 -k swap
 -a always,exit -F arch=b32 -S swapon -S swapoff -F auid!=-1 -k swap
 
 ## Time
+-a never,exit -F arch=b64 -S adjtimex -F exe=/usr/sbin/ntpd -k exclude_ntpd
 -a always,exit -F arch=b32 -S adjtimex -S settimeofday -S clock_settime -k time
 -a always,exit -F arch=b64 -S adjtimex -S settimeofday -S clock_settime -k time
 ### Local time zone
@@ -155,37 +158,9 @@
 -w /etc/profile.d/ -p wa -k login_modification
 
 ## Network Environment
-#
 ### Changes to hostname
 -a always,exit -F arch=b32 -S sethostname -S setdomainname -k network_modifications
 -a always,exit -F arch=b64 -S sethostname -S setdomainname -k network_modifications
-
-## Socket PF_INET
--a always,exit -F arch=b64 -S socket -F a0=2 -k socket_4
--a always,exit -F arch=b32 -S socket -F a0=2 -k socket_4
-
-## Socket PF_INET6
--a always,exit -F arch=b64 -S socket -F a0=10 -k socket_6
--a always,exit -F arch=b32 -S socket -F a0=10 -k socket_6
-
-## Socket PF_PACKET
--a always,exit -F arch=b64 -S socket -F a0=17 -k socket_pkt
--a always,exit -F arch=b32 -S socket -F a0=17 -k socket_pkt
-
-## Successful IPv4 Connections
--a always,exit -F arch=b64 -S connect -F a2=16 -F success=1 -F key=network_connect_4
--a always,exit -F arch=b32 -S connect -F a2=16 -F success=1 -F key=network_connect_4
-
-## Successful IPv6 Connections
--a always,exit -F arch=b64 -S connect -F a2=28 -F success=1 -F key=network_connect_6
--a always,exit -F arch=b32 -S connect -F a2=28 -F success=1 -F key=network_connect_6
-
-## Accept
--a always,exit -F arch=b64 -S accept -k network_accept
--a always,exit -F arch=b64 -S accept4 -k network_accept
--a always,exit -F arch=b32 -S accept4 -k network_accept
--a always,exit -F arch=b64 -S listen -k network_listen
--a always,exit -F arch=b32 -S listen -k network_listen
 
 ## https://github.com/spotify/linux/blob/master/include/linux/sockios.h
 -a always,exit -F arch=b32 -S ioctl -F a1>=0x890B -F a1<=0x890D -k ioctl_routing
@@ -483,18 +458,23 @@
 -a always,exit -F arch=b32 -S pivot_root -k possible_exploit_pivot
 -a always,exit -F arch=b64 -S pivot_root -k possible_exploit_pivot
 
+## https://github.com/torvalds/linux/blob/master/include/uapi/linux/prctl.h
 ## a0=f renames a process name in comm parameter
--a never,exit -F arch=b64 -S prctl -F exe=/usr/lib/systemd/systemd -k exclude_systemd_prctl
--a never,exit -F arch=b64 -S prctl -F exe=/usr/lib/systemd/systemd-journald -k exclude_systemd_prctl
--a never,exit -F arch=b64 -S prctl -F exe=/usr/libexec/nm-dispatcher -k exclude_nm_prctl
--a never,exit -F arch=b32 -S prctl -F a0<5 -k exclude_std_prctl
--a never,exit -F arch=b64 -S prctl -F a0<5 -k exclude_std_prctl
--a always,exit -F arch=b32 -S prctl -F a0!=13 -F a0!=14 -F a0!=27 -k possible_exploit_prctl
--a always,exit -F arch=b64 -S prctl -F a0!=13 -F a0!=14 -F a0!=27 -k possible_exploit_prctl
+-a always,exit -F arch=b32 -S prctl -F a0=22 possible_exploit_prctl_seccomp
+-a always,exit -F arch=b64 -S prctl -F a0=22 possible_exploit_prctl_seccomp
+-a always,exit -F arch=b32 -S prctl -F a0=35 possible_exploit_prctl_mmap
+-a always,exit -F arch=b64 -S prctl -F a0=35 possible_exploit_prctl_mmap
+-a always,exit -F arch=b32 -S prctl -F a0=0x59616d61 possible_exploit_prctl_ptrace
+-a always,exit -F arch=b64 -S prctl -F a0=0x59616d61 possible_exploit_prctl_ptrace
+-a always,exit -F arch=b32 -S prctl -F a0=53 possible_exploit_prctl_cpu_bug
+-a always,exit -F arch=b64 -S prctl -F a0=53 possible_exploit_prctl_cpu_bug
+-a always,exit -F arch=b32 -S prctl -F a0=59 possible_exploit_prctl_syscalld
+-a always,exit -F arch=b64 -S prctl -F a0=59 possible_exploit_prctl_syscalld
+
 ## exclude ARCH_SET_FS
 ## a0=0x3001 is a query for CET feature (Intel CPU code flow protection)
--a always,exit -F arch=b32 -S arch_prctl -F a0!=0x1002 -F a0!=0x3001 -k possible_exploit_prctl
--a always,exit -F arch=b64 -S arch_prctl -F a0!=0x1002 -F a0!=0x3001 -k possible_exploit_prctl
+-a always,exit -F arch=b32 -S arch_prctl -F a0!=0x1002 -F a0!=0x3001 -k possible_exploit_arch_prctl
+-a always,exit -F arch=b64 -S arch_prctl -F a0!=0x1002 -F a0!=0x3001 -k possible_exploit_arch_prctl
 -a never,exit -F arch=b64 -S iopl -F exe=/usr/bin/Xorg -k exclude_X11
 -a always,exit -F arch=b32 -S iopl -k possible_exploit_iopl
 -a always,exit -F arch=b64 -S iopl -k possible_exploit_iopl
@@ -540,6 +520,7 @@
 ## seteuid may be only a glibc wrapper
 ##-a always,exit -F arch=b32 -S seteuid -F a0=0 -k susp_activity_setid
 ##-a always,exit -F arch=b64 -S seteuid -F a0=0 -k susp_activity_setid
+-a never,exit -F arch=b64 -S setreuid -F exe=/usr/sbin/crond -k exclude_crond
 -a never,exit -F arch=b64 -S setreuid -F exe=/usr/lib/systemd/systemd -k exclude_setid_systemd
 -a never,exit -F arch=b64 -S setreuid -F exe=/usr/libexec/gdm-session-worker -k exclude_setid_gdm
 -a never,exit -F arch=b64 -S setregid -F exe=/usr/lib/systemd/systemd -k exclude_setid_systemd
@@ -572,77 +553,12 @@
 -a always,exit -F arch=b32 -S request_key -k susp_activity_kms
 -a always,exit -F arch=b64 -S request_key -k susp_activity_kms
 -a never,exit -F arch=b64 -S keyctl -F exe=/usr/libexec/goa-identity-service -k exclude_gnome_online_accounts
+-a never,exit -F arch=b64 -S keyctl -F exe=/usr/sbin/crond -k exclude_crond
 -a always,exit -F arch=b32 -S keyctl -k susp_activity_kms
 -a always,exit -F arch=b64 -S keyctl -k susp_activity_kms
-#-a always,exit -F arch=b32 -S inotify_init -k filemon
-#-a always,exit -F arch=b64 -S inotify_init -k filemon
-#-a always,exit -F arch=b32 -S inotify_init1 -k filemon
-#-a always,exit -F arch=b64 -S inotify_init1 -k filemon
-#-a always,exit -F arch=b32 -S fanotify_init -k filemon
-#-a always,exit -F arch=b64 -S fanotify_init -k filemon
--a always,exit -F arch=b32 -S fanotify_mark -F success=1 -k filemon
--a always,exit -F arch=b64 -S fanotify_mark -F success=1 -k filemon
 
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/sbin/abrtd -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/bin/abrt-watch-log -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/bin/dbus-daemon -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/bin/gnome-shell -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/bin/gnome-software -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/bin/ibus-daemon -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/bin/nautilus-desktop -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/bin/pulseaudio -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/lib64/realmd/realmd -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/accounts-daemon -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/colord -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/evolution-addressbook-factory -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/evolution-calendar-factory -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/evolution-source-registry -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/fwupd/fwupd -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/gnome-session-binary -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/goa-daemon -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/gsd-color -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/gsd-housekeeping -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/gsd-sound -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/gsd-xsettings -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/gvfs-afc-volume-monitor -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/gvfsd-trash -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/gvfs-udisks2-volume-monitor -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/ibus-dconf -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/ibus-engine-simple -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/ibus-portal -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/ibus-x11 -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/packagekitd -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/tracker-miner-apps -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/tracker-miner-fs -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/tracker-miner-user-guides -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/libexec/udisks2/udisksd -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/lib/polkit-1/polkitd -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/lib/systemd/systemd -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/sbin/avahi-daemon -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/sbin/dnsmasq -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/sbin/NetworkManager -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/sbin/rsyslogd -k exlude_filemon_usr
--a never,exit -F arch=b64 -S inotify_add_watch -F exe=/usr/bin/pkla-check-authorization -k exclude_pkla
-
--a always,exit -F arch=b32 -S inotify_add_watch -F success=1 -k filemon
--a always,exit -F arch=b64 -S inotify_add_watch -F success=1 -k filemon
-#-a always,exit -F arch=b32 -S inotify_rm_watch -k filemon
-#-a always,exit -F arch=b64 -S inotify_rm_watch -k filemon
 -a always,exit -F arch=b32 -S unshare -k susp_activity
 -a always,exit -F arch=b64 -S unshare -k susp_activity
--a never,exit -F arch=b64 -S utimensat -F exe=/usr/bin/cp -k exclude_ts_cp
--a never,exit -F arch=b64 -S utimensat -F exe=/usr/bin/touch -k exclude_ts_touch
--a never,exit -F arch=b64 -S utimensat -F exe=/usr/lib/systemd/systemd -k exclude_ts_systemd
--a never,exit -F arch=b64 -S utimensat -F exe=/usr/lib/systemd/systemd-udevd -k exclude_ts_systemd
--a always,exit -F arch=b32 -S utimensat -k susp_activity_ts
--a always,exit -F arch=b64 -S utimensat -k susp_activity_ts
-## futimens may not exist in favour of utimensat
-##-a always,exit -F arch=b32 -S futimens -k susp_activity_ts
-##-a always,exit -F arch=b64 -S futimens -k susp_activity_ts
--a always,exit -F arch=b32 -S utime -k susp_activity_ts
--a always,exit -F arch=b64 -S utime -k susp_activity_ts
--a always,exit -F arch=b32 -S utimes -k susp_activity_ts
--a always,exit -F arch=b64 -S utimes -k susp_activity_ts
 -a always,exit -F arch=b32 -S process_vm_readv -k susp_activity_vm
 -a always,exit -F arch=b64 -S process_vm_readv -k susp_activity_vm
 -a always,exit -F arch=b32 -S process_vm_writev -k susp_activity_vm
@@ -667,10 +583,10 @@
 -a always,exit -F arch=b32 -S rseq -k susp_activity_rseq
 -a always,exit -F arch=b64 -S rseq -k susp_activity_rseq
 
-##-a always,exit -F arch=b32 -S execve -k cmdline_audit
-##-a always,exit -F arch=b64 -S execve -k cmdline_audit
-##-a always,exit -F arch=b32 -S execveat -k cmdline_audit
-##-a always,exit -F arch=b64 -S execveat -k cmdline_audit
+-a always,exit -F arch=b32 -S execve -k cmdline_audit
+-a always,exit -F arch=b64 -S execve -k cmdline_audit
+-a always,exit -F arch=b32 -S execveat -k cmdline_audit
+-a always,exit -F arch=b64 -S execveat -k cmdline_audit
 
 -a never,exit -F arch=b64 -S open -F exe=/usr/lib/systemd/systemd -k exclude_systemd
 -a never,exit -F arch=b64 -S open -F exe=/usr/lib/systemd/systemd-sysctl -k exclude_systemd
@@ -711,6 +627,7 @@
 -w /root -p wa -k root_home_modifications
 -w /etc/ -p wa -k os_cfg_modification
 -w /boot/ -p wa -k os_modification
+-a never,exit -F path=/proc/self -k exclude_proc_self
 -w /proc/ -p wa -k os_runtime_modification
 -w /bin/ -p wa -k os_modification
 -w /sbin/ -p wa -k os_modification
@@ -722,48 +639,29 @@
 -w /var/run/ -p wa -k os_runtime_modification
 
 # Make the configuration immutable --------------------------------------------
-#-e 2
+-e 2
 
 ###################
 #[root@box audit]# cat /var/log/audit/audit.log | grep key= | awk '{print $NF}' | sort -u > cat.txt
 #[root@box audit]# for entry in `cat cat.txt`; do KEY=`echo $entry | cut -d\" -f2`; 
 # CNT=`grep -c "key=\"${KEY}\"" audit.log`; echo "$KEY -> $CNT"; done
-#auditlog -> 906
-#delete -> 68
-#etcpasswd -> 22
-#file_access_denied -> 5
-#file_creation_denied -> 120
-#filemon -> 292
-#ioctl_network -> 15
-#ioctl_network_bridge -> 9
-#KEXEC -> 4
-#kill -> 31
-#login -> 6
-#mount -> 4
-#network_accept -> 818
-#network_connect_4 -> 111
-#network_connect_6 -> 34
-#network_listen -> 84
+#auditlog -> 6
+#cmdline_audit -> 17
+#cron -> 13
+#etcpasswd -> 6
+#ioctl_network -> 64
+#kill -> 3
+#login -> 5
 #network_modifications -> 12
-#os_cfg_modification -> 22
-#os_fileaccess_denied -> 288
-#os_runtime_modification -> 2248
-#perm_mod -> 46
-#priv_esc -> 5
-#recon -> 63
-#root_cmd -> 2671
-#root_home_modifications -> 18
-#sbin_susp -> 15
+#os_cfg_modification -> 64
+#os_modification -> 140
+#os_runtime_modification -> 139
+#perm_mod -> 27
+#priv_esc -> 9
+#recon -> 75
+#root_cmd -> 1983
+#root_home_modifications -> 79
 #session -> 11
-#socket_4 -> 256
-#socket_6 -> 134
-#socket_pkt -> 4
-#special_files -> 38
-#susp_activity -> 40
-#susp_activity_file -> 26
-#susp_activity_kms -> 15
-#susp_activity_setid -> 19
-#systemd -> 5
-#time -> 8
-#user_modification -> 6
-
+#susp_activity -> 31
+#susp_activity_kms -> 31
+#susp_activity_setid -> 17
