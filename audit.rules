@@ -169,6 +169,33 @@
 -a always,exit -F arch=b32 -S ioctl -F a1>=0x8922 -F a1<=0x89a3 -k ioctl_network
 -a always,exit -F arch=b64 -S ioctl -F a1>=0x8922 -F a1<=0x89a3 -k ioctl_network
 
+## Socket PF_INET
+-a always,exit -F arch=b64 -S socket -F a0=2 -k socket_4
+-a always,exit -F arch=b32 -S socket -F a0=2 -k socket_4
+
+## Socket PF_INET6
+-a always,exit -F arch=b64 -S socket -F a0=10 -k socket_6
+-a always,exit -F arch=b32 -S socket -F a0=10 -k socket_6
+
+## Socket PF_PACKET
+-a always,exit -F arch=b64 -S socket -F a0=17 -k socket_pkt
+-a always,exit -F arch=b32 -S socket -F a0=17 -k socket_pkt
+
+## Successful IPv4 Connections
+-a always,exit -F arch=b64 -S connect -F a2=16 -F success=1 -F key=network_connect_4
+-a always,exit -F arch=b32 -S connect -F a2=16 -F success=1 -F key=network_connect_4
+
+## Successful IPv6 Connections
+-a always,exit -F arch=b64 -S connect -F a2=28 -F success=1 -F key=network_connect_6
+-a always,exit -F arch=b32 -S connect -F a2=28 -F success=1 -F key=network_connect_6
+
+## Accept
+-a always,exit -F arch=b64 -S accept -k network_accept
+-a always,exit -F arch=b64 -S accept4 -k network_accept
+-a always,exit -F arch=b32 -S accept4 -k network_accept
+-a always,exit -F arch=b64 -S listen -k network_listen
+-a always,exit -F arch=b32 -S listen -k network_listen
+
 ### Changes to other files
 -w /etc/hosts -p wa -k network_modifications
 -w /etc/sysconfig/network -p wa -k network_modifications
@@ -634,6 +661,7 @@
 -w /usr/ -p wa -k os_modification
 -w /lib/ -p wa -k os_modification
 -w /lib64/ -p wa -k os_modification
+-a never,exit -F path=/var/lib/rpm -k exclude_rpm
 -a never,exit -F path=/var/lib/rsyslog -k exclude_rsyslog
 -w /var/lib/ -p wa -k os_runtime_modification
 -w /var/run/ -p wa -k os_runtime_modification
