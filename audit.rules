@@ -615,6 +615,12 @@
 -a always,exit -F arch=b32 -S execveat -k cmdline_audit
 -a always,exit -F arch=b64 -S execveat -k cmdline_audit
 
+-a always,exit -F arch=b32 -S fork -S vfork -S clone -k process_chain
+-a always,exit -F arch=b64 -S fork -S vfork -S clone -k process_chain
+# Linux 5.3
+-a always,exit -F arch=b32 -S clone3 -k process_chain
+-a always,exit -F arch=b64 -S clone3 -k process_chain
+
 -a never,exit -F arch=b64 -S open -F exe=/usr/lib/systemd/systemd -k exclude_systemd
 -a never,exit -F arch=b64 -S open -F exe=/usr/lib/systemd/systemd-sysctl -k exclude_systemd
 -a never,exit -F arch=b64 -S open -F exe=/usr/lib/systemd/systemd-udevd -k exclude_systemd
