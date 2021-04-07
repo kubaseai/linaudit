@@ -28,7 +28,7 @@
 ### Modifications to audit configuration that occur while the audit collection functions are operating
 -w /etc/audit/ -p wa -k auditconfig
 -w /etc/libaudit.conf -p wa -k auditconfig
--w /etc/audisp/ -p wa -k audispconfig
+-w /etc/audisp/ -p wa -k auditconfig
 
 ## Monitor for use of audit management tools
 -w /sbin/auditctl -p x -k audittools
@@ -38,9 +38,6 @@
 # Filters ---------------------------------------------------------------------
 
 ### We put these early because audit is a first match wins system.
-
-## Ignore SELinux AVC records
--a always,exclude -F msgtype=AVC
 
 ## Ignore EOE records (End Of Event, not needed)
 -a always,exclude -F msgtype=EOE
@@ -56,17 +53,14 @@
 -a always,exclude -F msgtype=CRYPTO_KEY_USER
 
 ## VMWare tools
--a never,exit -F arch=b32 -S fork -F success=0 -F path=/usr/lib/vmware-tools -F subj_type=initrc_t -F exit=-2 -k no_vmw
--a never,exit -F arch=b64 -S fork -F success=0 -F path=/usr/lib/vmware-tools -F subj_type=initrc_t -F exit=-2 -k no_vmw
+-a never,exit -F arch=b32 -S fork -F success=0 -F path=/usr/lib/vmware-tools -F subj_type=initrc_t -F exit=-2 -k exclude_vmw
+-a never,exit -F arch=b64 -S fork -F success=0 -F path=/usr/lib/vmware-tools -F subj_type=initrc_t -F exit=-2 -k exclude_vmw
 
 ### High Volume Event Filter (especially on Linux Workstations)
 -a never,exit -F arch=b32 -F dir=/dev/shm -k shm_access
 -a never,exit -F arch=b64 -F dir=/dev/shm -k shm_access
 -a never,exit -F arch=b32 -F dir=/var/lock/lvm -k lock_lvm
 -a never,exit -F arch=b64 -F dir=/var/lock/lvm -k lock_lvm
-
-## More information on how to filter events
-### https://access.redhat.com/solutions/2482221
 
 # Rules -----------------------------------------------------------------------
 
@@ -157,6 +151,11 @@
 -w /etc/profile -p wa -k login_modification
 -w /etc/profile.d/ -p wa -k login_modification
 
+## Session initiation information
+-w /var/run/utmp -p wa -k session
+-w /var/log/btmp -p wa -k session
+-w /var/log/wtmp -p wa -k session
+
 ## Network Environment
 ### Changes to hostname
 -a always,exit -F arch=b32 -S sethostname -S setdomainname -k network_modifications
@@ -245,10 +244,10 @@
 -w /root/.ssh -p wa -k root_ssh_key
 
 ## ec2-user ssh key tampering
--w /home/ec2-user/.ssh -p wa -k ec2user_ssh_key
+-w /home/ec2-user/.ssh -p wa -k ec2_user_ssh_key
 
 # Systemd
--w /bin/systemctl -p x -k systemd
+-w /bin/systemctl -p x -k systemctl
 -w /etc/systemd/ -p wa -k systemd_modifications
 
 ## SELinux events that modify the system's Mandatory Access Controls (MAC)
@@ -280,11 +279,6 @@
 -w /sbin/poweroff -p x -k power
 -w /sbin/reboot -p x -k power
 -w /sbin/halt -p x -k power
-
-## Session initiation information
--w /var/run/utmp -p wa -k session
--w /var/log/btmp -p wa -k session
--w /var/log/wtmp -p wa -k session
 
 ## Discretionary Access Control (DAC) modifications
 -a always,exit -F arch=b32 -S chmod -F auid>=1000 -F auid!=-1 -k perm_mod
@@ -437,16 +431,28 @@
 -a always,exit -F arch=b64 -F euid=0 -S execve -k root_cmd
 -a always,exit -F arch=b32 -F euid=0 -S execve -k root_cmd
 
+## Command execution
+-a always,exit -F arch=b32 -S execve -k cmdline_audit
+-a always,exit -F arch=b64 -S execve -k cmdline_audit
+-a always,exit -F arch=b32 -S execveat -k cmdline_audit
+-a always,exit -F arch=b64 -S execveat -k cmdline_audit
+
+-a always,exit -F arch=b32 -S fork -S vfork -S clone -k process_chain
+-a always,exit -F arch=b64 -S fork -S vfork -S clone -k process_chain
+# Linux 5.3
+-a always,exit -F arch=b32 -S clone3 -k process_chain
+-a always,exit -F arch=b64 -S clone3 -k process_chain
+
 ## File Deletion Events by User
 -a always,exit -F arch=b32 -S rmdir -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=-1 -k delete
 -a always,exit -F arch=b64 -S rmdir -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=-1 -k delete
 
 ## File Access
 ### Unauthorized Access (unsuccessful)
--a always,exit -F arch=b32 -S creat -S open -S openat -S open_by_handle_at -S truncate -S ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=-1 -k file_access_denied
--a always,exit -F arch=b32 -S creat -S open -S openat -S open_by_handle_at -S truncate -S ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=-1 -k file_access_denied
--a always,exit -F arch=b64 -S creat -S open -S openat -S open_by_handle_at -S truncate -S ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=-1 -k file_access_denied
--a always,exit -F arch=b64 -S creat -S open -S openat -S open_by_handle_at -S truncate -S ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=-1 -k file_access_denied
+-a always,exit -F arch=b32 -S creat -S open -S openat -S open_by_handle_at -F exit=-EACCES -F auid>=1000 -F auid!=-1 -k file_access_denied
+-a always,exit -F arch=b32 -S creat -S open -S openat -S open_by_handle_at -F exit=-EPERM -F auid>=1000 -F auid!=-1 -k file_access_denied
+-a always,exit -F arch=b64 -S creat -S open -S openat -S open_by_handle_at -F exit=-EACCES -F auid>=1000 -F auid!=-1 -k file_access_denied
+-a always,exit -F arch=b64 -S creat -S open -S openat -S open_by_handle_at -F exit=-EPERM -F auid>=1000 -F auid!=-1 -k file_access_denied
 
 ### Unsuccessful Creation
 -a never,exit -F arch=b64 -S mkdir,creat,link,symlink,mknod,mknodat,linkat,symlinkat -F exe=/usr/bin/pkla-check-authorization -k exclude_file_creation_denied
@@ -462,10 +468,10 @@
 -a always,exit -F arch=b64 -S mkdir,link,symlink,mkdirat -F exit=-EPERM -k file_creation_denied
 
 ### Unsuccessful Modification
--a always,exit -F arch=b32 -S rename -S renameat -S truncate -S chmod -S setxattr -S lsetxattr -S removexattr -S lremovexattr -F exit=-EACCES -k file_modification_denied
--a always,exit -F arch=b64 -S rename -S renameat -S truncate -S chmod -S setxattr -S lsetxattr -S removexattr -S lremovexattr -F exit=-EACCES -k file_modification_denied
--a always,exit -F arch=b32 -S rename -S renameat -S truncate -S chmod -S setxattr -S lsetxattr -S removexattr -S lremovexattr -F exit=-EPERM -k file_modification_denied
--a always,exit -F arch=b64 -S rename -S renameat -S truncate -S chmod -S setxattr -S lsetxattr -S removexattr -S lremovexattr -F exit=-EPERM -k file_modification_denied
+-a always,exit -F arch=b32 -S rename -S renameat -S truncate -S ftruncate -S chmod -S setxattr -S lsetxattr -S removexattr -S lremovexattr -F exit=-EACCES -k file_modification_denied
+-a always,exit -F arch=b64 -S rename -S renameat -S truncate -S ftruncate -S chmod -S setxattr -S lsetxattr -S removexattr -S lremovexattr -F exit=-EACCES -k file_modification_denied
+-a always,exit -F arch=b32 -S rename -S renameat -S truncate -S ftruncate -S chmod -S setxattr -S lsetxattr -S removexattr -S lremovexattr -F exit=-EPERM -k file_modification_denied
+-a always,exit -F arch=b64 -S rename -S renameat -S truncate -S ftruncate -S chmod -S setxattr -S lsetxattr -S removexattr -S lremovexattr -F exit=-EPERM -k file_modification_denied
 
 ## 32bit API Exploitation
 ### If you are on a 64 bit platform, everything _should_ be running
@@ -498,7 +504,7 @@
 -a always,exit -F arch=b32 -S prctl -F a0=59 possible_exploit_prctl_syscalld
 -a always,exit -F arch=b64 -S prctl -F a0=59 possible_exploit_prctl_syscalld
 
-## exclude ARCH_SET_FS
+## exclude ARCH_SET_FS 0x1002
 ## a0=0x3001 is a query for CET feature (Intel CPU code flow protection)
 -a always,exit -F arch=b32 -S arch_prctl -F a0!=0x1002 -F a0!=0x3001 -k possible_exploit_arch_prctl
 -a always,exit -F arch=b64 -S arch_prctl -F a0!=0x1002 -F a0!=0x3001 -k possible_exploit_arch_prctl
@@ -542,8 +548,10 @@
 -a never,exit -F arch=b64 -S mincore -F exe=/usr/libexec/gnome-session-check-accelerated-gles-helper -k exclude_gles
 -a always,exit -F arch=b32 -S mincore -k possible_exploit_mem
 -a always,exit -F arch=b64 -S mincore -k possible_exploit_mem
+
 -a always,exit -F arch=b32 -S kill -F a1=9 -k kill
 -a always,exit -F arch=b64 -S kill -F a1=9 -k kill
+
 ## seteuid may be only a glibc wrapper
 ##-a always,exit -F arch=b32 -S seteuid -F a0=0 -k susp_activity_setid
 ##-a always,exit -F arch=b64 -S seteuid -F a0=0 -k susp_activity_setid
@@ -555,6 +563,7 @@
 -a never,exit -F arch=b64 -S setresgid -F exe=/usr/lib/systemd/systemd -k exclude_setid_systemd
 -a never,exit -F arch=b64 -S setfsuid -F exe=/usr/lib/systemd/systemd -k exclude_setid_systemd
 -a never,exit -F arch=b64 -S setfsgid -F exe=/usr/lib/systemd/systemd -k exclude_setid_systemd
+
 -a always,exit -F arch=b32 -S setreuid -F a0=0 -k susp_activity_setid
 -a always,exit -F arch=b64 -S setreuid -F a0=0 -k susp_activity_setid
 -a always,exit -F arch=b32 -S setregid -F a0=0 -k susp_activity_setid
@@ -567,6 +576,7 @@
 -a always,exit -F arch=b64 -S setfsuid -F a0=0 -k susp_activity_setid
 -a always,exit -F arch=b32 -S setfsgid -F a0=0 -k susp_activity_setid
 -a always,exit -F arch=b64 -S setfsgid -F a0=0 -k susp_activity_setid
+
 -a always,exit -F arch=b32 -S mbind -k susp_activity_numa
 -a always,exit -F arch=b64 -S mbind -k susp_activity_numa
 -a always,exit -F arch=b32 -S set_mempolicy -k susp_activity_numa
@@ -597,8 +607,10 @@
 -a always,exit -F arch=b64 -S seccomp -k seccomp
 -a always,exit -F arch=b32 -S getrandom -F a1>=4096 -k possible_crypto
 -a always,exit -F arch=b64 -S getrandom -F a1>=4096 -k possible_crypto
--a always,exit -F arch=b32 -S memfd_create -k susp_activity_file
--a always,exit -F arch=b64 -S memfd_create -k susp_activity_file
+
+-a always,exit -F arch=b32 -S memfd_create -k susp_activity_fileless_malware
+-a always,exit -F arch=b64 -S memfd_create -k susp_activity_fileless_malware
+
 -a always,exit -F arch=b32 -S bpf -k bpf_bytecode
 -a always,exit -F arch=b64 -S bpf -k bpf_bytecode
 -a always,exit -F arch=b32 -S pkey_alloc -k susp_activity_mem
@@ -609,17 +621,6 @@
 ## not widely used, https://www.efficios.com/blog/2019/02/08/linux-restartable-sequences/
 -a always,exit -F arch=b32 -S rseq -k susp_activity_rseq
 -a always,exit -F arch=b64 -S rseq -k susp_activity_rseq
-
--a always,exit -F arch=b32 -S execve -k cmdline_audit
--a always,exit -F arch=b64 -S execve -k cmdline_audit
--a always,exit -F arch=b32 -S execveat -k cmdline_audit
--a always,exit -F arch=b64 -S execveat -k cmdline_audit
-
--a always,exit -F arch=b32 -S fork -S vfork -S clone -k process_chain
--a always,exit -F arch=b64 -S fork -S vfork -S clone -k process_chain
-# Linux 5.3
--a always,exit -F arch=b32 -S clone3 -k process_chain
--a always,exit -F arch=b64 -S clone3 -k process_chain
 
 -a never,exit -F arch=b64 -S open -F exe=/usr/lib/systemd/systemd -k exclude_systemd
 -a never,exit -F arch=b64 -S open -F exe=/usr/lib/systemd/systemd-sysctl -k exclude_systemd
